@@ -90,6 +90,16 @@
 #include "nrf_cli_uart.h"
 #endif
 
+#if defined(NRF_CLI_RTT_ENABLED)
+#define CLI_OVER_SEGGER_RTT 1
+#else
+#define CLI_OVER_SEGGER_RTT 0
+#endif
+
+#if CLI_OVER_SEGGER_RTT
+#include "nrf_cli_rtt.h"
+#endif
+
 #include "zigbee_cli.h"
 
 #if CLI_OVER_USB_CDC_ACM
@@ -201,6 +211,15 @@ NRF_CLI_DEF(m_cli_uart,
             CLI_EXAMPLE_LOG_QUEUE_SIZE);
 #endif
 
+#if CLI_OVER_SEGGER_RTT
+NRF_CLI_RTT_DEF(m_cli_rtt_transport);
+NRF_CLI_DEF(m_cli_rtt,
+            "> ",
+            &m_cli_rtt_transport.transport,
+            '\r',
+            CLI_EXAMPLE_LOG_QUEUE_SIZE);
+#endif
+
 static void timer_handle(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
@@ -217,6 +236,11 @@ static void cli_start(void)
 
 #if CLI_OVER_UART
     ret = nrf_cli_start(&m_cli_uart);
+    APP_ERROR_CHECK(ret);
+#endif
+
+#if CLI_OVER_SEGGER_RTT
+    ret = nrf_cli_start(&m_cli_rtt);
     APP_ERROR_CHECK(ret);
 #endif
 }
@@ -240,6 +264,11 @@ static void cli_init(void)
     uart_config.hwfc    = NRF_UART_HWFC_ENABLED;
     #endif
     ret = nrf_cli_init(&m_cli_uart, &uart_config, true, true, NRF_LOG_SEVERITY_NONE);
+    APP_ERROR_CHECK(ret);
+#endif
+
+#if CLI_OVER_SEGGER_RTT
+    ret = nrf_cli_init(&m_cli_rtt, NULL, true, true, NRF_LOG_SEVERITY_NONE);
     APP_ERROR_CHECK(ret);
 #endif
 }
@@ -297,6 +326,10 @@ static void cli_process(void)
 
 #if CLI_OVER_UART
     nrf_cli_process(&m_cli_uart);
+#endif
+
+#if CLI_OVER_SEGGER_RTT
+    nrf_cli_process(&m_cli_rtt);
 #endif
 }
 
