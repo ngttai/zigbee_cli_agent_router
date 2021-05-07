@@ -1,0 +1,90 @@
+{
+    "env": {
+        "SDK_ROOT": "${HOME}/Documents/SunshineTech/Projects/SmartHomeFirmwareZigbee/nrf-homekit-gateway-fw/nrf-sdk-zigbee",
+        "PROJ_DIR": "${workspaceFolder}",
+        "INC_DIR": [
+            "${PROJ_DIR}",
+            "${PROJ_DIR}/components/zigbee/common",
+            "${PROJ_DIR}/components/zigbee/cli",
+            "${SDK_ROOT}/external/zboss/osif",
+            "${SDK_ROOT}/external/utf_converter",
+            "${SDK_ROOT}/external/zboss/addons",
+            "${SDK_ROOT}/components/libraries/usbd/class/cdc/acm",
+            "${SDK_ROOT}/integration/nrfx",
+            "${SDK_ROOT}/components/libraries/cli/uart",
+            "${SDK_ROOT}/external/zboss/zb_error",
+            "${SDK_ROOT}/external/nRF-IEEE-802.15.4-radio-driver/src",
+            "${SDK_ROOT}/components/libraries/scheduler",
+            "${SDK_ROOT}/components/libraries/cli/cdc_acm",
+            "${SDK_ROOT}/components/libraries/experimental_section_vars",
+            "${SDK_ROOT}/components/libraries/atomic_fifo",
+            "${SDK_ROOT}/external/fnmatch",
+            "${SDK_ROOT}/modules/nrfx/mdk",
+            "${SDK_ROOT}/components/libraries/queue",
+            "${SDK_ROOT}/components/libraries/strerror",
+            "${SDK_ROOT}/components/libraries/cli/rtt",
+            "${SDK_ROOT}/components/boards",
+            "${SDK_ROOT}/external/nRF-IEEE-802.15.4-radio-driver/src/fem",
+            "${SDK_ROOT}/components/libraries/cli",
+            "${SDK_ROOT}/components/drivers_nrf/nrf_soc_nosd",
+            "${SDK_ROOT}/components/libraries/usbd/class/cdc",
+            "${SDK_ROOT}/integration/nrfx/legacy",
+            "${SDK_ROOT}/components/libraries/button",
+            "${SDK_ROOT}/components/libraries/log",
+            "${SDK_ROOT}/modules/nrfx/hal",
+            "${SDK_ROOT}/components/libraries/log/src",
+            "${SDK_ROOT}/components/libraries/bsp",
+            "${SDK_ROOT}/components/libraries/sortlist",
+            "${SDK_ROOT}/modules/nrfx/drivers/include",
+            "${SDK_ROOT}/external/zboss/include/zcl",
+            "${SDK_ROOT}/components/libraries/ringbuf",
+            "${SDK_ROOT}/external/fprintf",
+            "${SDK_ROOT}/components/libraries/balloc",
+            "${SDK_ROOT}/components/libraries/util",
+            "${SDK_ROOT}/modules/nrfx",
+            "${SDK_ROOT}/components",
+            "${SDK_ROOT}/external/segger_rtt",
+            "${SDK_ROOT}/external/zboss/include",
+            "${SDK_ROOT}/components/libraries/memobj",
+            "${SDK_ROOT}/external/nRF-IEEE-802.15.4-radio-driver/src/fem/three_pin_gpio",
+            "${SDK_ROOT}/components/libraries/usbd",
+            "${SDK_ROOT}/components/libraries/atomic",
+            "${SDK_ROOT}/external/zboss/include/ha",
+            "${SDK_ROOT}/external/zboss/include/osif",
+            "${SDK_ROOT}/components/libraries/delay",
+            "${SDK_ROOT}/components/toolchain/cmsis/include",
+            "${SDK_ROOT}/components/libraries/mutex",
+            "${SDK_ROOT}/components/libraries/pwr_mgmt",
+            "${SDK_ROOT}/components/libraries/fstorage",
+            "${SDK_ROOT}/components/libraries/timer"
+        ],
+        "COMMON_DEFS": [
+            "APP_TIMER_V2",
+            "APP_TIMER_V2_RTC1_ENABLED",
+            "CONFIG_GPIO_AS_PINRESET",
+            "FLOAT_ABI_HARD",
+            "ZB_TRACE_LEVEL=0",
+            "ZB_TRACE_MASK=0"
+        ]
+    },
+    "configurations": [
+        {
+            "name": "M2_DEVKIT",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/m2devkit/blank/config",
+                "${INC_DIR}"
+            ],
+            "defines": [
+                "BOARD_CUSTOM",
+                "NRF52840_XXAA",
+                "${COMMON_DEFS}"
+            ],
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-arm"
+        }
+    ],
+    "version": 4
+}
