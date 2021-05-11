@@ -2,7 +2,7 @@ PROJECT_NAME     := zigbee_cli_agent_router_pca10056
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := _build
 
-SDK_ROOT := $(HOME)/Documents/SunshineTech/Projects/SmartHomeFirmwareZigbee/nrf-homekit-fw/nrf_sdk_zigbee
+SDK_ROOT := $(HOME)/NTTai_Projects/nrf-homekit-gateway-fw/nrf-sdk-zigbee
 PROJ_DIR := ../../..
 
 $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \

@@ -2,7 +2,7 @@ PROJECT_NAME     := zigbee_cli_agent_router_pca10100
 TARGETS          := nrf52833_xxaa
 OUTPUT_DIRECTORY := _build
 
-SDK_ROOT := $(HOME)/Documents/SunshineTech/Projects/SmartHomeFirmwareZigbee/nrf-homekit-fw/nrf_sdk_zigbee
+SDK_ROOT := $(HOME)/NTTai_Projects/nrf-homekit-gateway-fw/nrf-sdk-zigbee
 PROJ_DIR := ../../..
 
 $(OUTPUT_DIRECTORY)/nrf52833_xxaa.out: \
@@ -84,19 +84,19 @@ SRC_FILES += \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
   $(PROJ_DIR)/main.c \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52833.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_attr.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_attr_report.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_bdb.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_generic_cmd.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_ping.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_radio.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_zcl.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_cmd_zdo.c \
-  $(SDK_ROOT)/components/zigbee/cli/zigbee_cli_utils.c \
-  $(SDK_ROOT)/components/zigbee/common/zigbee_helpers.c \
-  $(SDK_ROOT)/components/zigbee/common/zigbee_logger_eprxzcl.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_attr.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_attr_report.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_bdb.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_generic_cmd.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_ping.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_radio.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_zcl.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_zdo.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_utils.c \
+  $(PROJ_DIR)/components/zigbee/common/zigbee_helpers.c \
+  $(PROJ_DIR)/components/zigbee/common/zigbee_logger_eprxzcl.c \
   $(SDK_ROOT)/external/utf_converter/utf.c \
 
 # Include folders common to all targets
@@ -115,7 +115,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/experimental_section_vars \
   $(SDK_ROOT)/components/libraries/atomic_fifo \
   $(SDK_ROOT)/external/fnmatch \
-  $(SDK_ROOT)/components/zigbee/common \
+  $(PROJ_DIR)/components/zigbee/common \
   $(SDK_ROOT)/modules/nrfx/mdk \
   $(SDK_ROOT)/components/libraries/queue \
   $(SDK_ROOT)/components/libraries/strerror \
@@ -149,7 +149,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/atomic \
   $(SDK_ROOT)/external/zboss/include/ha \
   $(SDK_ROOT)/external/zboss/include/osif \
-  $(SDK_ROOT)/components/zigbee/cli \
+  $(PROJ_DIR)/components/zigbee/cli \
   $(SDK_ROOT)/components/libraries/delay \
   $(SDK_ROOT)/components/toolchain/cmsis/include \
   $(SDK_ROOT)/components/libraries/mutex \
@@ -184,7 +184,7 @@ CFLAGS += -Wall -Werror
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 # keep every function in a separate section, this allows linker to discard unused ones
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin -fshort-enums -Wno-packed-bitfield-compat
+CFLAGS += -fno-builtin -fshort-enums -Wno-packed-bitfield-compat -Wno-address-of-packed-member
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
