@@ -320,8 +320,8 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
     bytes_written = 0;
     while (p_attr_resp != NULL)
     {
-        bytes_written = zcl_attr_to_str(&print_buf[bytes_written],
-                                        sizeof(print_buf) - bytes_written,
+        bytes_written = zcl_attr_to_str(print_buf,
+                                        sizeof(print_buf),
                                         p_attr_resp->attr_type,
                                         p_attr_resp->attr_value);
 
@@ -334,6 +334,7 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
             NRF_LOG_INST_INFO(m_log.p_log, "    Profile: 0x%04x Cluster: 0x%04x Attribute: 0x%04x Type: %hu Value: %s",
                 p_zcl_hdr->profile_id, p_zcl_hdr->cluster_id, p_attr_resp->attr_id,
                 p_attr_resp->attr_type, nrf_log_push(print_buf));
+            ZB_MEMSET(print_buf, 0x00, bytes_written);
         }
 
         ZB_ZCL_GENERAL_GET_NEXT_REPORT_ATTR_REQ(bufid, p_attr_resp);
