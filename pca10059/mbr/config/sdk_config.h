@@ -97,7 +97,7 @@
 // <i> 802.15.4 channel used by Zigbee. Defaults to 16.
 
 #ifndef ZIGBEE_CHANNEL
-#define ZIGBEE_CHANNEL 11
+#define ZIGBEE_CHANNEL 16
 #endif
 
 // <o> ZIGBEE_TRACE_LEVEL - Trace level of Zigbee stack logs.  <0-4> 
@@ -5429,14 +5429,12 @@
 #define ZIGBEE_CLI_CONFIG_DEBUG_COLOR 0
 #endif
 
-// <o> ZIGBEE_CLI_ENDPOINT - Device endpoint on which the Zigbee ping specific communication will happen  <1-240> 
-
-
-#ifndef ZIGBEE_CLI_ENDPOINT
-#define ZIGBEE_CLI_ENDPOINT 64
-#endif
-
 // </e>
+
+// <o> ZIGBEE_CLI_ENDPOINT - Device endpoint on which the Zigbee ping specific communication will happen  <1-240> 
+#ifndef ZIGBEE_CLI_ENDPOINT
+#define ZIGBEE_CLI_ENDPOINT 1
+#endif
 
 // </h> 
 //==========================================================

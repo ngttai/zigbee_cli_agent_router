@@ -5429,14 +5429,12 @@
 #define ZIGBEE_CLI_CONFIG_DEBUG_COLOR 0
 #endif
 
-// <o> ZIGBEE_CLI_ENDPOINT - Device endpoint on which the Zigbee ping specific communication will happen  <1-240> 
-
-
-#ifndef ZIGBEE_CLI_ENDPOINT
-#define ZIGBEE_CLI_ENDPOINT 64
-#endif
-
 // </e>
+
+// <o> ZIGBEE_CLI_ENDPOINT - Device endpoint on which the Zigbee ping specific communication will happen  <1-240> 
+#ifndef ZIGBEE_CLI_ENDPOINT
+#define ZIGBEE_CLI_ENDPOINT 1
+#endif
 
 // </h> 
 //==========================================================

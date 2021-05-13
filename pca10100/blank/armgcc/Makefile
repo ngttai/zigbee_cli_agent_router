@@ -90,6 +90,7 @@ SRC_FILES += \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_attr_report.c \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_bdb.c \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_generic_cmd.c \
+  $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_nwk.c \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_ping.c \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_radio.c \
   $(PROJ_DIR)/components/zigbee/cli/zigbee_cli_cmd_zcl.c \
