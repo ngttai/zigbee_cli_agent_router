@@ -59,6 +59,9 @@
 #ifdef BOARD_PCA10100
 #define ERASE_PIN    NRF_GPIO_PIN_MAP(1,6)                                          /**< Pin 1.06. */
 #endif
+#if defined (BOARD_CUSTOM) && defined (NRF52840_M2)
+#define ERASE_PIN    NRF_GPIO_PIN_MAP(0,19)                                         /**< Pin 1.06. */
+#endif
 #define READ_RETRIES 10                                                             /**< Number of retries until the pin value stabilizes. */
 
 #ifndef ZB_DEV_REJOIN_TIMEOUT_MS
@@ -105,7 +108,7 @@ static void stop_network_rejoin(zb_uint8_t was_scheduled);
  */
 zb_void_t zigbee_erase_persistent_storage(zb_bool_t erase)
 {
-#if defined (BOARD_PCA10056) || defined (BOARD_PCA10059) || defined (BOARD_PCA10100)
+#if defined (BOARD_PCA10056) || defined (BOARD_PCA10059) || defined (BOARD_PCA10100) || (defined (BOARD_CUSTOM) && defined (NRF52840_M2))
     if (!erase)
     {
         nrf_gpio_cfg_input(ERASE_PIN, NRF_GPIO_PIN_PULLUP);
