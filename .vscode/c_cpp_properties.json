@@ -85,7 +85,7 @@
             "forcedInclude": [
                 "${workspaceFolder}/.vscode/c_cpp_undef.h"
             ],
-            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "compilerPath": "/usr/local/bin/arm-none-eabi-gcc",
             "cStandard": "gnu17",
             "cppStandard": "gnu++14",
             "intelliSenseMode": "gcc-arm"

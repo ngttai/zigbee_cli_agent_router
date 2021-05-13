@@ -52,11 +52,13 @@
 
 #define ATTRIBUTE_TABLE_SIZE     20
 #define ATTRIBUTE_ROW_TIMEOUT_S  10
+#define DISC_ATTRIBUTE_MAX_LEN   32
 
 typedef enum attr_type_e
 {
     ATTR_READ_REQUEST,
-    ATTR_WRITE_REQUEST
+    ATTR_WRITE_REQUEST,
+    ATTR_DISC_REQUEST
 } attr_req_type_t;
 
 /**@brief The row of the table which holds the requests which were sent.
@@ -197,7 +199,8 @@ static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, attr_query_t * p_row)
 
     if (p_hdr->cmd_id != ZB_ZCL_CMD_DEFAULT_RESP &&
         p_hdr->cmd_id != ZB_ZCL_CMD_READ_ATTRIB_RESP &&
-        p_hdr->cmd_id != ZB_ZCL_CMD_WRITE_ATTRIB_RESP)
+        p_hdr->cmd_id != ZB_ZCL_CMD_WRITE_ATTRIB_RESP &&
+        p_hdr->cmd_id != ZB_ZCL_CMD_DISC_ATTRIB_RESP)
     {
         return ZB_FALSE;
     }
@@ -226,7 +229,7 @@ static void print_read_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
         }
         else
         {
-            nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: %d Type: 0x%x Value: %s\r\n",
+            nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: 0x%04hx Type: 0x%02hx Value: %s\r\n",
                             p_attr_resp->attr_id, p_attr_resp->attr_type, attr_buf);
             print_done(p_row->p_cli, ZB_FALSE);
         }
@@ -265,6 +268,41 @@ static void print_write_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
     print_done(p_row->p_cli, ZB_FALSE);
 }
 
+/**@brief Print the Discover Attribute Response
+ *
+ * @param bufid     Zigbee buffer ID with Discover Attribute Response packet.
+ * @param p_row     Pointer to a row in attr table
+ */
+static void print_disc_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
+{
+    zb_zcl_disc_attr_info_t * p_attr_resp;
+    zb_uint8_t disc_complete = 0;
+
+    ZB_ZCL_GENERAL_GET_COMPLETE_DISC_RES(bufid, disc_complete);
+
+    /* Get the contents of Discover Attribute Response frame */
+    ZB_ZCL_GENERAL_GET_NEXT_DISC_ATTR_RES(bufid, p_attr_resp);
+    while (p_attr_resp != NULL) 
+    {
+        nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: 0x%04hx Type: 0x%02hx",
+        p_attr_resp->attr_id, p_attr_resp->data_type);
+        ZB_ZCL_GENERAL_GET_NEXT_DISC_ATTR_RES(bufid, p_attr_resp);
+    }
+
+    if (!disc_complete)
+    {
+        nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL,
+                        "\r\nThere are still attributes to discover!\r\n");
+    }
+    else
+    {
+        nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL,
+                        "\r\nAll Attributes Discovered!\r\n");
+    }
+    print_done(p_row->p_cli, ZB_FALSE);
+    
+}
+
 /**@brief The Handler to 'intercept' every frame coming to the endpoint
  *
  * @param bufid    ZBOSS buffer id.
@@ -301,10 +339,15 @@ static zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
         {
             print_read_attr_response(bufid, p_row);
         }
-        else
+        else if (p_row->req_type == ATTR_WRITE_REQUEST)
         {
             print_write_attr_response(bufid, p_row);
         }
+        else
+        {
+            print_disc_attr_response(bufid, p_row);
+        }
+        
     }
     /* Cancel the ongoing alarm which was to erase the row... */
     UNUSED_RETURN_VALUE(ZB_SCHEDULE_APP_ALARM_CANCEL(invalidate_row_cb, row));
@@ -380,6 +423,45 @@ static zb_void_t writeattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
                                        zb_get_cli_endpoint(), p_row->profile_id,
                                        p_row->cluster_id, frame_acked_cb);
 }
+
+/**@brief Actually construct the Discover Attribute frame and send it.
+ *
+ * @param bufid     ZBOSS buffer id.
+ * @param cb_param  Row of the discover attribute table to refer to.
+ */
+static zb_void_t disc_attr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
+{
+    zb_ret_t zb_err_code;
+    zb_uint8_t row = cb_param;
+    attr_query_t * p_row = &(m_attr_table[row]);
+    p_row->seq_num = ZCL_CTX().seq_number;
+
+    zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, row,
+                                        ATTRIBUTE_ROW_TIMEOUT_S * ZB_TIME_ONE_SECOND);
+    if (zb_err_code != RET_OK)
+    {
+        print_error(p_row->p_cli, "No frame left - wait a bit", ZB_FALSE);
+        /* Invalidate row so that we can reuse it */
+        invalidate_row(row);
+        zb_buf_free(bufid);
+        return;
+    }
+
+    ZB_ZCL_GENERAL_DISC_ATTR_REQ_A(bufid,
+                                   cmd_ptr,
+                                   p_row->direction,
+                                   ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
+                                   p_row->attr_id, /* start_attr_id */
+                                   p_row->attr_value[0], /* max_len */
+                                   p_row->remote_node,
+                                   p_row->remote_addr_mode,
+                                   p_row->remote_ep,
+                                   zb_get_cli_endpoint(),
+                                   p_row->profile_id,
+                                   p_row->cluster_id,
+                                   frame_acked_cb);
+}
+
 
 /**@brief Retrieve the attribute value of the remote node.
  *
@@ -579,6 +661,107 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     p_row->p_cli = (nrf_cli_t*)p_cli;
 
     zb_err_code = zb_buf_get_out_delayed_ext(writeattr_send, row, 0);
+    if (zb_err_code != RET_OK)
+    {
+        print_error(p_cli, "No frame left - wait a bit", ZB_FALSE);
+        /* Invalidate row so that we can reuse it */
+        invalidate_row(row);
+    }
+}
+
+/**@brief Discover attribute on a cluster of the remote node.
+ *
+ * @code
+ * zcl attr disc <h:dst_addr> <d:ep> <h:cluster> [-c] <h:profile> <h:start_attr_id> <d:max_attr>
+ * @endcode
+ *
+ * Discover attribute from `attr_id` in the cluster `cluster`.
+ * The cluster belongs to the profile `profile`, which resides on the endpoint
+ * `ep` of the remote node `dst_addr`. If the attribute is on the client role
+ * side of the cluster, use the `-c` switch.
+ */
+void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
+{
+    zb_ret_t zb_err_code;
+    zb_int8_t row = get_free_row_attr_table();
+
+    if (nrf_cli_help_requested(p_cli))
+    {
+        nrf_cli_help_print(p_cli, NULL, 0);
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  discover <h:dst_addr> <d:ep> <h:cluster> [-c] ");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:profile> <h:start_attr ID> <d:max_attr>\r\n");
+        return;
+    }
+
+    bool is_direction_present = ((argc == 8) && !strcmp(argv[4], "-c"));
+
+    if (argc != 7 && !is_direction_present)
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        return;
+    }
+
+    if (row == -1)
+    {
+        print_error(p_cli, "Request pool empty - wait a bit", ZB_FALSE);
+        return;
+    }
+
+    attr_query_t * p_row = &(m_attr_table[row]);
+
+    p_row->remote_addr_mode = parse_address(*(++argv), &(p_row->remote_node), ADDR_ANY);
+    if (p_row->remote_addr_mode == ADDR_INVALID)
+    {
+        print_error(p_cli, "Invalid address", ZB_FALSE);
+        return;
+    }
+
+    UNUSED_RETURN_VALUE(sscan_uint8(*(++argv), &(p_row->remote_ep)));
+
+    if (!parse_hex_u16(*(++argv), &(p_row->cluster_id)))
+    {
+        print_error(p_cli, "Invalid cluster id", ZB_FALSE);
+        return;
+    }
+
+    if (is_direction_present)
+    {
+        p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_CLI;
+        ++argv;
+    }
+    else
+    {
+        p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_SRV;
+    }
+
+    if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+    {
+        print_error(p_cli, "Invalid profile id", ZB_FALSE);
+        return;
+    }
+
+    if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
+    {
+        print_error(p_cli, "Invalid start attribute id", ZB_FALSE);
+        return;
+    }
+
+    if (!sscan_uint8(*(++argv), &(p_row->attr_value[0])))
+    {
+        print_error(p_cli, "Invalid discover attribute len", ZB_FALSE);
+    }
+    else if (p_row->attr_value[0] == 0)
+    {
+        p_row->attr_value[0] = DISC_ATTRIBUTE_MAX_LEN;
+    }
+    
+    p_row->req_type = ATTR_DISC_REQUEST;
+    p_row->taken = ZB_TRUE;
+    /* Put the CLI instance to be used later */
+    p_row->p_cli = (nrf_cli_t*)p_cli;
+
+    zb_err_code = zb_buf_get_out_delayed_ext(disc_attr_send, row, 0);
     if (zb_err_code != RET_OK)
     {
         print_error(p_cli, "No frame left - wait a bit", ZB_FALSE);

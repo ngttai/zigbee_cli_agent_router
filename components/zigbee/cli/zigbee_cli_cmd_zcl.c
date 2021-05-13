@@ -50,6 +50,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_attr)
 {
     NRF_CLI_CMD(read, NULL, "read attribute", cmd_zb_readattr),
     NRF_CLI_CMD(write, NULL, "write attribute", cmd_zb_writeattr),
+    NRF_CLI_CMD(discover, NULL, "discover attribute", cmd_zb_disc_attr),
     NRF_CLI_SUBCMD_SET_END
 };
 
