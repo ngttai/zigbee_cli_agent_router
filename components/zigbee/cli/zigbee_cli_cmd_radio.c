@@ -336,6 +336,63 @@ static void cmd_zb_channel_get(nrf_cli_t const * p_cli, size_t argc, char **argv
 }
 
 
+static void cmd_zb_tx_power_set(nrf_cli_t const * p_cli, size_t argc, char **argv)
+{
+    if (nrf_cli_help_requested(p_cli))
+    {
+        nrf_cli_help_print(p_cli, NULL, 0);
+        return;
+    }
+
+    if (argc == 2)
+    {
+        int8_t tx_power;
+
+        if (!sscan_int8(argv[1], &tx_power))
+        {
+            print_error(p_cli, "Invalid tx_power", ZB_FALSE);
+        }
+        else
+        {
+            switch ((uint8_t)tx_power)
+            {
+            case NRF_RADIO_TXPOWER_POS8DBM:
+            case NRF_RADIO_TXPOWER_POS7DBM:
+            case NRF_RADIO_TXPOWER_POS6DBM:
+            case NRF_RADIO_TXPOWER_POS5DBM:
+            case NRF_RADIO_TXPOWER_POS3DBM:
+            case NRF_RADIO_TXPOWER_POS2DBM:
+            case NRF_RADIO_TXPOWER_0DBM:
+            case NRF_RADIO_TXPOWER_NEG4DBM:
+            case NRF_RADIO_TXPOWER_NEG8DBM:
+            case NRF_RADIO_TXPOWER_NEG12DBM:
+            case NRF_RADIO_TXPOWER_NEG16DBM:
+            case NRF_RADIO_TXPOWER_NEG20DBM:
+            case NRF_RADIO_TXPOWER_NEG40DBM:
+                nrf_802154_tx_power_set(tx_power);
+                print_done(p_cli, ZB_TRUE);
+                break;
+            default:
+                print_error(p_cli, "Only tx_power:\r\n"
+                                   "       8, 7, 6, 5, 3, 2, 0, 4, -8, -12, -16, -20, -40\r\n"
+                                   "       are supported.",
+                            ZB_FALSE);
+                break;
+            }
+        }
+    }
+    else
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+    }
+}
+
+static void cmd_zb_tx_power_get(nrf_cli_t const * p_cli, size_t argc, char **argv)
+{
+    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Current tx_power: %d", nrf_802154_tx_power_get());
+    print_done(p_cli, ZB_TRUE);
+}
+
 NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_fem_line_pa)
 {
     NRF_CLI_CMD(pin, NULL, "select pin number to use", cmd_zb_fem_line_pa),
@@ -373,10 +430,18 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_channel)
     NRF_CLI_SUBCMD_SET_END
 };
 
+NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_tx_power)
+{
+    NRF_CLI_CMD(set, NULL, "set 802.15.4 tx_power", cmd_zb_tx_power_set),
+    NRF_CLI_CMD(get, NULL, "get 802.15.4 tx_power", cmd_zb_tx_power_get),
+    NRF_CLI_SUBCMD_SET_END
+};
+
 NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_radio)
 {
     NRF_CLI_CMD(fem, &m_sub_fem, "front-end module", NULL),
     NRF_CLI_CMD(channel, &m_sub_channel, "get/set channel", NULL),
+    NRF_CLI_CMD(tx_power, &m_sub_tx_power, "get/set tx_power", NULL),
     NRF_CLI_SUBCMD_SET_END
 };
 NRF_CLI_CMD_REGISTER(radio, &m_sub_radio, "Radio manipulation", NULL);

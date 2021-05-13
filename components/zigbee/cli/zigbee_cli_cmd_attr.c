@@ -226,7 +226,7 @@ static void print_read_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
         }
         else
         {
-            nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: %d Type: %x Value: %s\r\n",
+            nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: %d Type: 0x%x Value: %s\r\n",
                             p_attr_resp->attr_id, p_attr_resp->attr_type, attr_buf);
             print_done(p_row->p_cli, ZB_FALSE);
         }

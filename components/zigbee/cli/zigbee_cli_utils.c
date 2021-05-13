@@ -169,6 +169,20 @@ int sscan_uint8(const char * p_bp, uint8_t * p_u8)
     return 1;
 }
 
+int sscan_int8(const char * p_bp, int8_t * p_i8)
+{
+    int value;
+
+    if (!sscanf(p_bp, "%d", &value) || ((value < -128)) || (value > 127))
+    {
+        return 0;
+    }
+
+    *p_i8 = value & 0xFF;
+
+    return 1;
+}
+
 void print_hexdump(nrf_cli_t const * p_cli,
                    const uint8_t * p_in, uint8_t size,
                    bool reverse)

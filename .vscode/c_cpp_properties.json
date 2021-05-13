@@ -1,6 +1,8 @@
 {
     "env": {
-        "SDK_ROOT": "${HOME}/NTTai_Projects/nrf-homekit-gateway-fw/nrf-sdk-zigbee",
+        // export SDK_ROOT=${HOME}/SunshineTECH/code/nrf-homekit-gateway-fw/nrf-sdk-zigbee
+        // code .
+        // "SDK_ROOT": "${HOME}/SunshineTECH/code/nrf-homekit-gateway-fw/nrf-sdk-zigbee",
         "PROJ_DIR": "${workspaceFolder}",
         "INC_DIR": [
             "${PROJ_DIR}",
@@ -83,7 +85,7 @@
             "forcedInclude": [
                 "${workspaceFolder}/.vscode/c_cpp_undef.h"
             ],
-            "compilerPath": "/usr/local/bin/arm-none-eabi-gcc",
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
             "cStandard": "gnu17",
             "cppStandard": "gnu++14",
             "intelliSenseMode": "gcc-arm"

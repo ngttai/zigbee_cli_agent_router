@@ -139,6 +139,18 @@ int zcl_attr_to_str(char * p_str_buf, uint16_t buf_len, zb_uint16_t attr_type, z
  */
 int sscan_uint8(const char * p_bp, uint8_t * p_u8);
 
+/**
+ * @brief Parse int8_t from input string.
+ *
+ * The reason for this explicit function is because newlib-nano sscanf() does not support 1-byte target.
+ *
+ * @param[in]  p_bp Pointer to input string.
+ * @param[out] p_i8 Pointer to output value.
+ *
+ * @return 1 on success, 0 otherwise
+ */
+int sscan_int8(const char * p_bp, int8_t * p_i8);
+
 /**@brief Print buffer as hex string.
  *
  * @param p_cli     Pointer to CLI instance.
