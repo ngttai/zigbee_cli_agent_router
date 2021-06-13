@@ -704,8 +704,7 @@ static void cmd_zb_match_desc(nrf_cli_t const * p_cli, size_t argc, char **argv)
     zb_ret_t                    zb_err_code;
     zb_bool_t                   use_timeout = ZB_FALSE;
     zb_uint16_t                 timeout = ZIGBEE_CLI_MATCH_DESC_RESP_TIMEOUT;
-    int                         timeout_offset;
-    zb_uint16_t                 temp;
+    zb_uint8_t                  index = 1;
 
     // We use p_cluster_list for calls to ZBOSS API but we're not using
     // p_cluster_list value in any way.
@@ -715,20 +714,20 @@ static void cmd_zb_match_desc(nrf_cli_t const * p_cli, size_t argc, char **argv)
     {
         print_usage(p_cli, argv[0],
                     "<h:16-bit destination address>\r\n"
-                    "<h:requested address/type> <h:profile ID>\r\n"
+                    "<h:requested address/type> [-p <h:profile ID>]\r\n"
                     "<d:number of input clusters> [<h:input cluster IDs> ...]\r\n"
                     "<d:number of output clusters> [<h:output cluster IDs> ...]\r\n"
                     "[--timeout d:number of seconds to wait for answers]\r\n");
         return;
     }
 
-    if (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--timeout"))
+    if (!strcmp(argv[index], "-t") || !strcmp(argv[index], "--timeout"))
     {
         print_error(p_cli, "Place option 'timeout' at the end of input parameters", ZB_FALSE);
         return;
     }
 
-    if (argc < 6)
+    if (argc < 5)
     {
         print_error(p_cli, "Incorrect number of arguments", ZB_FALSE);
         return;
@@ -743,36 +742,46 @@ static void cmd_zb_match_desc(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     p_req = zb_buf_initial_alloc(bufid, sizeof(*p_req));
 
-    if (!parse_hex_u16(argv[1], &temp))
+    if (!parse_hex_u16(argv[index], &(p_req->nwk_addr)))
     {
         print_error(p_cli, "Incorrect network address", ZB_FALSE);
         goto error;
     }
-    p_req->nwk_addr = temp;
+    index++;
 
-    if (!parse_hex_u16(argv[2], &temp))
+    if (!parse_hex_u16(argv[index], &(p_req->addr_of_interest)))
     {
         print_error(p_cli, "Incorrect address of interest", ZB_FALSE);
         goto error;
     }
-    p_req->addr_of_interest = temp;
+    index++;
 
-    if (!parse_hex_u16(argv[3], &temp))
+    /* Check if different from HA profile should be used */
+    if (strcmp(argv[index], "-p") == 0)
     {
-        print_error(p_cli, "Incorrect profile id", ZB_FALSE);
-        goto error;
+        if (!parse_hex_u16(argv[++index], &(p_req->profile_id)))
+        {
+            print_error(p_cli, "Profile id value", ZB_FALSE);
+            goto error;
+        }
+        index++;
     }
-    p_req->profile_id = temp;
+    else
+    {
+        p_req->profile_id = ZB_AF_HA_PROFILE_ID;
+    }
+    
 
     // The following functions don't perform any checks on the cluster list
     // assuming that the CLI isn't abused. In practice the list length is limited
     // by @p NRF_CLI_ARGC_MAX which defaults to 12 arguments.
 
-    if (!sscan_uint8(argv[4], &(p_req->num_in_clusters)))
+    if (!sscan_uint8(argv[index], &(p_req->num_in_clusters)))
     {
         print_error(p_cli, "Incorrect number of input clusters", ZB_FALSE);
         goto error;
     }
+    index++;
 
     if (p_req->num_in_clusters)
     {
@@ -786,42 +795,45 @@ static void cmd_zb_match_desc(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
         // Use p_req->cluster_list as destination rather that p_cluster_list which
         // points to the second element.
-        if (!sscan_cluster_list(argv + 5, p_req->num_in_clusters, (uint16_t *)p_req->cluster_list))
+        if (((index + p_req->num_in_clusters) > argc) ||
+            !sscan_cluster_list(argv + index, p_req->num_in_clusters, (uint16_t *)p_req->cluster_list))
         {
             print_error(p_cli, "Failed to parse input cluster list", ZB_FALSE);
             goto error;
         }
+        index += p_req->num_in_clusters;
 
     }
 
-    if (!sscan_uint8(argv[5 + p_req->num_in_clusters], &(p_req->num_out_clusters)))
+    if (!sscan_uint8(argv[index], &(p_req->num_out_clusters)))
     {
         print_error(p_cli, "Incorrect number of output clusters", ZB_FALSE);
         goto error;
     }
+    index++;
 
     if (p_req->num_out_clusters)
     {
         p_cluster_list = zb_buf_alloc_right(bufid, p_req->num_out_clusters * sizeof(uint16_t) - len);
 
-        if (!sscan_cluster_list(argv + 5 + p_req->num_in_clusters + 1,
+        if (((index + p_req->num_out_clusters) > argc) ||
+            !sscan_cluster_list(argv + index,
                                 p_req->num_out_clusters,
                                 (uint16_t *)p_req->cluster_list + p_req->num_in_clusters))
         {
             print_error(p_cli, "Failed to parse output cluster list", ZB_FALSE);
             goto error;
         }
+        index += p_req->num_out_clusters;        
     }
 
     // Now let's check for timeout option
-    timeout_offset = 6 + p_req->num_in_clusters + p_req->num_out_clusters;
-
-    if (argc == timeout_offset + 2)
+    if (argc == index + 2)
     {
-        if (!strcmp(argv[timeout_offset], "-t") || !strcmp(argv[timeout_offset], "--timeout"))
+        if (!strcmp(argv[index], "-t") || !strcmp(argv[index], "--timeout"))
         {
             use_timeout = ZB_TRUE;
-            if (sscanf(argv[timeout_offset + 1], "%hd", &timeout) != 1)
+            if (sscanf(argv[index + 1], "%hd", &timeout) != 1)
             {
                 /* Let's set the timeout to default in this case. */
                 timeout = ZIGBEE_CLI_MATCH_DESC_RESP_TIMEOUT;

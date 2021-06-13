@@ -277,7 +277,7 @@ static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 /**@brief Send generic command to the remote node.
  *
  * @code
- * zcl cmd [-d] <h:dst_addr> <d:ep> <h:cluster> [-p h:profile <h:cmd_ID> [-l h:payload]
+ * zcl cmd [-d] <h:dst_addr> <d:ep> <h:cluster> [-p h:profile] <h:cmd_ID> [-l h:payload]
  * @endcode
  *
  * Send generic command with ID `cmd_ID` with payload `payload` to the cluster `cluster`.

@@ -1,8 +1,6 @@
 {
     "env": {
-        // export SDK_ROOT=${HOME}/SunshineTECH/code/nrf-homekit-gateway-fw/nrf-sdk-zigbee
-        // code .
-        // "SDK_ROOT": "${HOME}/SunshineTECH/code/nrf-homekit-gateway-fw/nrf-sdk-zigbee",
+        "SDK_ROOT": "${HOME}/SunshineTECH/Projects/nrf-homekit-gateway-fw/nrf-sdk-zigbee",
         "PROJ_DIR": "${workspaceFolder}",
         "INC_DIR": [
             "${PROJ_DIR}",
