@@ -402,19 +402,25 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     {
         print_usage(p_cli, argv[0],
                     "<h:addr> <d:ep> <h:cluster>\r\n"
-                    "<h:profile> <h:attr ID> <d:attr type>\r\n"
+                    "[-p <h:profile>] <h:attr ID> <h:attr type>\r\n"
                     "[<d:min interval (s)>] [<d:max interval (s)>]\r\n");
         return;
     }
 
-    if ((((argc < 7) || (argc > 9)) && (subscribe == ZB_TRUE)) ||
-        ((argc != 7) && (subscribe == ZB_FALSE)))
+    bool is_ha_profile_present = (!strcmp(argv[4], "-p"));
+
+    if ((!is_ha_profile_present &&
+         ((((argc < 6) || (argc > 8)) && (subscribe == ZB_TRUE)) ||
+          ((argc != 6) && (subscribe == ZB_FALSE)))) ||
+        (is_ha_profile_present &&
+         ((((argc < 8) || (argc > 10)) && (subscribe == ZB_TRUE)) ||
+          ((argc != 8) && (subscribe == ZB_FALSE)))))
     {
         print_error(p_cli, "Incorrect number of arguments", ZB_FALSE);
         return;
     }
 
-    req.remote_addr_mode = parse_address(argv[1], &req.remote_node, ADDR_ANY);
+    req.remote_addr_mode = parse_address(*(++argv), &(req.remote_node), ADDR_ANY);
 
     if (req.remote_addr_mode == ADDR_INVALID)
     {
@@ -422,31 +428,40 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    if (!sscan_uint8(argv[2], &(req.remote_ep)))
+    if (!sscan_uint8(*(++argv), &(req.remote_ep)))
     {
         print_error(p_cli, "Incorrect remote endpoint", ZB_FALSE);
         return;
     }
 
-    if (!parse_hex_u16(argv[3], &(req.cluster_id)))
+    if (!parse_hex_u16(*(++argv), &(req.cluster_id)))
     {
         print_error(p_cli, "Incorrect cluster ID", ZB_FALSE);
         return;
     }
 
-    if (!parse_hex_u16(argv[4], &(req.profile_id)))
+    /* Check if different from HA profile should be used */
+    if (is_ha_profile_present)
     {
-        print_error(p_cli, "Incorrect profile ID", ZB_FALSE);
-        return;
+        argv++;
+        if (!parse_hex_u16(*(++argv), &(req.profile_id)))
+        {
+            print_error(p_cli, "Incorrect profile ID", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        req.profile_id = ZB_AF_HA_PROFILE_ID;
     }
 
-    if (!parse_hex_u16(argv[5], &(req.attr_id)))
+    if (!parse_hex_u16(*(++argv), &(req.attr_id)))
     {
         print_error(p_cli, "Incorrect attribute ID", ZB_FALSE);
         return;
     }
 
-    if (!sscan_uint8(argv[6], &(req.attr_type)))
+    if (!parse_hex_u8(*(++argv), &(req.attr_type)))
     {
         print_error(p_cli, "Incorrect attribute type", ZB_FALSE);
         return;
@@ -464,18 +479,20 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         req.interval_max = ZIGBEE_CLI_CONFIGURE_REPORT_OFF_MAX_INTERVAL;
     }
 
-    if (argc > 7)
+    if ((!is_ha_profile_present && (argc > 6)) ||
+        (is_ha_profile_present && (argc > 8)))
     {
-        if (!sscanf(argv[7], "%hu", &(req.interval_min)))
+        if (!sscanf(*(++argv), "%hu", &(req.interval_min)))
         {
             print_error(p_cli, "Incorrect minimum interval", ZB_FALSE);
             return;
         }
     }
 
-    if (argc > 8)
+    if ((!is_ha_profile_present && (argc > 7)) ||
+        (is_ha_profile_present && (argc > 9)))
     {
-        if (!sscanf(argv[8], "%hu", &(req.interval_max)))
+        if (!sscanf(*(++argv), "%hu", &(req.interval_max)))
         {
             print_error(p_cli, "Incorrect maximum interval", ZB_FALSE);
             return;
