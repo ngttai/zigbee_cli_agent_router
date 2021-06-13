@@ -479,18 +479,27 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     zb_ret_t zb_err_code;
     zb_int8_t row = get_free_row_attr_table();
 
-    if (nrf_cli_help_requested(p_cli))
+    if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
         nrf_cli_help_print(p_cli, NULL, 0);
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  readattr <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:profile> <h:attr ID>\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:attr ID>\r\n");
         return;
     }
 
-    bool is_direction_present = ((argc == 7) && !strcmp(argv[4], "-c"));
+    if ((argc < 5) || (argc > 8))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        return;
+    }
 
-    if (argc != 6 && !is_direction_present)
+    bool is_direction_present = ((argc != 7) && !strcmp(argv[4], "-c"));
+    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
+                                 (is_direction_present && !strcmp(argv[5], "-p"));
+
+    if ((((argc == 6) || (argc == 8)) && !is_direction_present) ||
+        (((argc == 7) || (argc == 8)) && !is_ha_profile_present))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -529,10 +538,19 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_SRV;
     }
 
-    if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+    /* Check if different from HA profile should be used */
+    if (is_ha_profile_present)
     {
-        print_error(p_cli, "Invalid profile id", ZB_FALSE);
-        return;
+        argv++;
+        if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+        {
+            print_error(p_cli, "Invalid profile id", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        p_row->profile_id = ZB_AF_HA_PROFILE_ID;
     }
 
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
@@ -574,19 +592,28 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     zb_ret_t zb_err_code;
     zb_int8_t row = get_free_row_attr_table();
 
-    if (nrf_cli_help_requested(p_cli))
+    if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
         nrf_cli_help_print(p_cli, NULL, 0);
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  writeattr <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:profile> <h:attr ID> <h:attr type> ");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:attr ID> <h:attr type> ");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:attr value>\r\n");
         return;
     }
+    
+    if ((argc < 7) || (argc > 10))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        return;
+    }
 
-    bool is_direction_present = ((argc == 9) && !strcmp(argv[4], "-c"));
+    bool is_direction_present = ((argc != 9) && !strcmp(argv[4], "-c"));
+    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
+                                 (is_direction_present && !strcmp(argv[5], "-p"));
 
-    if (argc != 8 && !is_direction_present)
+    if ((((argc == 8) || (argc == 10)) && !is_direction_present) ||
+        (((argc == 9) || (argc == 10)) && !is_ha_profile_present))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -625,11 +652,21 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_SRV;
     }
 
-    if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+    /* Check if different from HA profile should be used */
+    if (is_ha_profile_present)
     {
-        print_error(p_cli, "Invalid profile id", ZB_FALSE);
-        return;
+        argv++;
+        if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+        {
+            print_error(p_cli, "Invalid profile id", ZB_FALSE);
+            return;
+        }
     }
+    else
+    {
+        p_row->profile_id = ZB_AF_HA_PROFILE_ID;
+    }
+    
 
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
     {
@@ -685,18 +722,27 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     zb_ret_t zb_err_code;
     zb_int8_t row = get_free_row_attr_table();
 
-    if (nrf_cli_help_requested(p_cli))
+    if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
         nrf_cli_help_print(p_cli, NULL, 0);
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  discover <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:profile> <h:start_attr ID> <d:max_attr>\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:start_attr ID> <d:max_attr>\r\n");
         return;
     }
 
-    bool is_direction_present = ((argc == 8) && !strcmp(argv[4], "-c"));
+    if ((argc < 6) || (argc > 9))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        return;
+    }
+    
+    bool is_direction_present = ((argc != 8) && !strcmp(argv[4], "-c"));
+    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
+                                 (is_direction_present && !strcmp(argv[5], "-p"));
 
-    if (argc != 7 && !is_direction_present)
+    if ((((argc == 7) || (argc == 9)) && !is_direction_present) ||
+        (((argc == 8) || (argc == 9)) && !is_ha_profile_present))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -735,10 +781,19 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_SRV;
     }
 
-    if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+    /* Check if different from HA profile should be used */
+    if (is_ha_profile_present)
     {
-        print_error(p_cli, "Invalid profile id", ZB_FALSE);
-        return;
+        argv++;
+        if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
+        {
+            print_error(p_cli, "Invalid profile id", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        p_row->profile_id = ZB_AF_HA_PROFILE_ID;
     }
 
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
@@ -750,6 +805,7 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     if (!sscan_uint8(*(++argv), &(p_row->attr_value[0])))
     {
         print_error(p_cli, "Invalid discover attribute len", ZB_FALSE);
+        return;
     }
     else if (p_row->attr_value[0] == 0)
     {
