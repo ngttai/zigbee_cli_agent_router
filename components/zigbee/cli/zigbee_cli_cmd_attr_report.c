@@ -119,6 +119,13 @@ static log_ctx_t m_log = {
 
 static tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_CONFIGURE_REPORT_TSN];
 
+/* Command options description */
+static const nrf_cli_getopt_option_t opt[] = {
+    NRF_CLI_OPT(
+        "",
+        "-p",
+        "Set profile ID, HA profile by default"),
+};
 
 /**
  * @brief Return a pointer to context with the given transaction sequence number.
@@ -400,10 +407,16 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     if ((argc == 1) || (nrf_cli_help_requested(p_cli)))
     {
-        print_usage(p_cli, argv[0],
-                    "<h:addr> <d:ep> <h:cluster>\r\n"
-                    "[-p <h:profile>] <h:attr ID> <h:attr type>\r\n"
-                    "[<d:min interval (s)>] [<d:max interval (s)>]\r\n");
+        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %03s %s\r\n", argv[0],
+                        "<h:dst_addr> <d:ep> <h:cluster> [-p <h:profile>] \r\n"
+                        "       <h:attr ID> <h:attr type>");
+        if (subscribe == ZB_TRUE)
+        {
+            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "       [<d:min interval (s)>] [<d:max interval (s)>]\r\n");
+        }
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 

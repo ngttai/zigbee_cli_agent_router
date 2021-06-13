@@ -89,6 +89,14 @@ typedef struct zdo_tsn_ctx {
 
 static zdo_tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_ZDO_TSN];
 
+/* Command options description */
+static const nrf_cli_getopt_option_t opt[] = {
+    NRF_CLI_OPT(
+        "",
+        "-p",
+        "Set profile ID, HA profile by default"),
+};
+
 /**
  * @brief Return a pointer to context with the given transaction sequence number.
  *
@@ -712,12 +720,14 @@ static void cmd_zb_match_desc(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     if ((argc == 1) || (nrf_cli_help_requested(p_cli)))
     {
-        print_usage(p_cli, argv[0],
-                    "<h:16-bit destination address>\r\n"
-                    "<h:requested address/type> [-p <h:profile ID>]\r\n"
-                    "<d:number of input clusters> [<h:input cluster IDs> ...]\r\n"
-                    "<d:number of output clusters> [<h:output cluster IDs> ...]\r\n"
-                    "[--timeout d:number of seconds to wait for answers]\r\n");
+        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
+                        "<h:16-bit destination address> <h:requested address/type> [-p <h:profile ID>]\r\n"
+                        "              <d:number of input clusters> [<h:input cluster IDs> ...]\r\n"
+                        "              <d:number of output clusters> [<h:output cluster IDs> ...]\r\n"
+                        "              [--timeout d:number of seconds to wait for answers]");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 

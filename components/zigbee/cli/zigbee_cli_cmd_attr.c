@@ -87,6 +87,18 @@ typedef struct attr_query_s
 
 static attr_query_t m_attr_table[ATTRIBUTE_TABLE_SIZE];
 
+/* Command options description */
+static const nrf_cli_getopt_option_t opt[] = {
+    NRF_CLI_OPT(
+        "",
+        "-c",
+        "Switches the server-to-client direction"),
+    NRF_CLI_OPT(
+        "",
+        "-p",
+        "Set profile ID, HA profile by default"),
+};
+
 /**@brief Get the first free row in the attributes table, return -1 if none
  */
 static zb_int8_t get_free_row_attr_table()
@@ -481,10 +493,12 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  readattr <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:attr ID>\r\n");
+        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
+                        "        <h:attr ID>");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 
@@ -594,14 +608,15 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  writeattr <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:attr ID> <h:attr type> ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "<h:attr value>\r\n");
+        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
+                        "         <h:attr ID> <h:attr type> <h:attr value>");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
-    
+
     if ((argc < 7) || (argc > 10))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
@@ -724,10 +739,12 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
     {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  h: is for hex, d: is for decimal, -c switches the server-to-client direction\r\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "  discover <h:dst_addr> <d:ep> <h:cluster> [-c] ");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "[-p <h:profile>] <h:start_attr ID> <d:max_attr>\r\n");
+        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
+                        "            <h:start_attr ID> <d:max_attr>");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 
