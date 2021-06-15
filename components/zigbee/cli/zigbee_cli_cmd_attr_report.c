@@ -123,6 +123,10 @@ static tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_CONFIGURE_REPORT_TSN];
 static const nrf_cli_getopt_option_t opt[] = {
     NRF_CLI_OPT(
         "",
+        "-c",
+        "Switches the server-to-client direction"),
+    NRF_CLI_OPT(
+        "",
         "-p",
         "Set profile ID, HA profile by default"),
 };
@@ -410,7 +414,7 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %03s %s\r\n", argv[0],
-                        "<h:dst_addr> <d:ep> <h:cluster> [-p <h:profile>] \r\n"
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
                         "       <h:attr ID> <h:attr type>");
         if (subscribe == ZB_TRUE)
         {
@@ -420,14 +424,18 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    bool is_ha_profile_present = (!strcmp(argv[4], "-p"));
+    bool is_direction_present = (!strcmp(argv[4], "-c"));
+    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
+                                 (is_direction_present && !strcmp(argv[5], "-p"));
 
-    if ((!is_ha_profile_present &&
-         ((((argc < 6) || (argc > 8)) && (subscribe == ZB_TRUE)) ||
-          ((argc != 6) && (subscribe == ZB_FALSE)))) ||
-        (is_ha_profile_present &&
-         ((((argc < 8) || (argc > 10)) && (subscribe == ZB_TRUE)) ||
-          ((argc != 8) && (subscribe == ZB_FALSE)))))
+    if (((subscribe == ZB_TRUE) && ((is_direction_present && is_ha_profile_present && ((argc < 9) || (argc > 11))) ||
+                                    (!is_direction_present && is_ha_profile_present && ((argc < 8) || (argc > 10))) ||
+                                    (is_direction_present && !is_ha_profile_present && ((argc < 7) || (argc > 9))) ||
+                                    (!is_direction_present && !is_ha_profile_present && ((argc < 6) || (argc > 8))))) ||
+        ((subscribe == ZB_FALSE) && ((is_direction_present && is_ha_profile_present && (argc != 9)) ||
+                                     (!is_direction_present && is_ha_profile_present && (argc != 8)) ||
+                                     (is_direction_present && !is_ha_profile_present && (argc != 7)) ||
+                                     (!is_direction_present && !is_ha_profile_present && (argc != 6)))))
     {
         print_error(p_cli, "Incorrect number of arguments", ZB_FALSE);
         return;
@@ -451,6 +459,11 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     {
         print_error(p_cli, "Incorrect cluster ID", ZB_FALSE);
         return;
+    }
+
+    if (is_direction_present)
+    {
+        argv++;
     }
 
     /* Check if different from HA profile should be used */
@@ -533,9 +546,18 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     p_tsn_cli->tsn   = ZCL_CTX().seq_number;
 
     // Construct and send request.
-    ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_SRV_REQ(bufid,
-                                                    p_cmd_ptr,
-                                                    ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    if (is_direction_present)
+    {
+        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_CLI_REQ(bufid,
+                                                        p_cmd_ptr,
+                                                        ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    }
+    else
+    {
+        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_SRV_REQ(bufid,
+                                                        p_cmd_ptr,
+                                                        ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    }
     ZB_ZCL_GENERAL_ADD_SEND_REPORT_CONFIGURE_REPORTING_REQ(p_cmd_ptr,
         req.attr_id, req.attr_type, req.interval_min, req.interval_max,
         ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_VALUE_CHANGE);
