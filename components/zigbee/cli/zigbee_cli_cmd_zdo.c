@@ -2085,6 +2085,114 @@ error:
     }
 }
 
+static void send_permit_join_for_me(zb_uint8_t param)
+{ 
+    zb_uint8_t               duration = 0;
+    zdo_tsn_ctx_t          * p_tsn_ctx;
+    zb_zdo_callback_info_t * p_resp = (zb_zdo_callback_info_t *)zb_buf_begin(param);
+    p_tsn_ctx = get_ctx_by_tsn(p_resp->tsn);
+    if (p_tsn_ctx == NULL)
+    {
+        NRF_LOG_ERROR("Unable to find context for TSN %d", p_resp->tsn);
+        zb_buf_free(param);
+        return;
+    }
+    duration = p_resp->status;
+
+    zb_zdo_mgmt_permit_joining_req_param_t *req = ZB_BUF_GET_PARAM(param,
+                                                                   zb_zdo_mgmt_permit_joining_req_param_t);
+
+    ZB_BZERO(req, sizeof(zb_zdo_mgmt_permit_joining_req_param_t));
+    req->permit_duration = duration;
+    req->dest_addr = ZB_PIBCACHE_NETWORK_ADDRESS();
+    zb_zdo_mgmt_permit_joining_req(param, NULL);
+
+    nrf_cli_fprintf(p_tsn_ctx->p_cli,
+                    NRF_CLI_NORMAL,
+                    "\r\nSet permit join duration: %ds",
+                    req->permit_duration);
+    print_done(p_tsn_ctx->p_cli, ZB_TRUE);
+    
+    invalidate_ctx(p_tsn_ctx);
+}
+
+/**
+ * @brief Send a ZDO permit join command.
+ *
+ * @code
+ * zdo permit_join <d:time in second>
+ * @endcode
+ *
+ * Example:
+ * @code
+ * zdo permit_join 60
+ * @endcode
+ * Sends @c permit_join with duration 60 second.
+ */
+static void cmd_zb_permit_join(nrf_cli_t const * p_cli, size_t argc, char **argv)
+{
+    zb_zdo_mgmt_permit_joining_req_param_t * p_req;
+    zb_bufid_t                               bufid   = 0;
+    zdo_tsn_ctx_t                          * p_tsn_cli = NULL;
+    
+    if ((argc == 1) || nrf_cli_help_requested(p_cli))
+    {
+        print_usage(p_cli, argv[0], "<d:duration in second>");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   To stop permit_join set duration=0\r\n");
+        return;
+    }
+
+    if (argc > 2)
+    {
+        print_error(p_cli, "Incorrect number of arguments", ZB_FALSE);
+        return;
+    }
+
+    bufid = zb_buf_get_out();
+    if (!bufid)
+    {
+        print_error(p_cli, "Failed to execute command (buf alloc failed)", ZB_FALSE);
+        return;
+    }
+    p_req = ZB_BUF_GET_PARAM(bufid, zb_zdo_mgmt_permit_joining_req_param_t);
+    ZB_BZERO(p_req, sizeof(zb_zdo_mgmt_permit_joining_req_param_t));
+
+    if (!sscan_uint8(*(++argv), &(p_req->permit_duration)))
+    {
+        print_error(p_cli, "Incorrect permit join duration", ZB_FALSE);
+        goto error;
+    }
+
+    p_req->dest_addr = ZB_NWK_BROADCAST_ROUTER_COORDINATOR;
+    p_req->tc_significance = ZB_TRUE;
+
+    p_tsn_cli = get_free_ctx();
+    if (p_tsn_cli == NULL)
+    {
+        print_error(p_cli, "Too many ZDO transactions", ZB_FALSE);
+        goto error;
+    }
+    p_tsn_cli->p_cli = p_cli;
+    p_tsn_cli->tsn = zb_zdo_mgmt_permit_joining_req(bufid, send_permit_join_for_me);
+
+    if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
+    {
+        print_error(p_cli, "Failed to send permit join request", ZB_FALSE);
+        goto error;
+    }
+    return;
+
+error:
+    if (bufid != 0)
+    {
+        zb_buf_free(bufid);
+    }
+    if (p_tsn_cli != NULL)
+    {
+        invalidate_ctx(p_tsn_cli);
+    }
+}
+
 NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_bind)
 {
     NRF_CLI_CMD(on, NULL, "create bind entry", cmd_zb_bind),
@@ -2105,6 +2213,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_zdo)
     NRF_CLI_CMD(mgmt_bind, NULL, "get binding table (see spec. 2.4.3.3.4)", cmd_zb_mgmt_bind),
     NRF_CLI_CMD(mgmt_leave, NULL, "perform mgmt_leave_req (see spec. 2.4.3.3.5)", cmd_zb_mgmt_leave),
     NRF_CLI_CMD(mgmt_lqi, NULL, "perform mgmt_lqi_req", cmd_zb_mgmt_lqi),
+    NRF_CLI_CMD(permit_join, NULL, "perform permit_join_req", cmd_zb_permit_join),
     NRF_CLI_SUBCMD_SET_END
 };
 

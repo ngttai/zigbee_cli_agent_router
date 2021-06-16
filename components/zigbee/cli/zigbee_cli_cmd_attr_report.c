@@ -342,7 +342,7 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
         }
         else
         {
-            NRF_LOG_INST_INFO(m_log.p_log, "    Profile: 0x%04x Cluster: 0x%04x Attribute: 0x%04x Type: %hu Value: %s",
+            NRF_LOG_INST_INFO(m_log.p_log, "    Profile: 0x%04hx Cluster: 0x%04hx Attribute: 0x%04hx Type: 0x%02hx Value: %s",
                 p_zcl_hdr->profile_id, p_zcl_hdr->cluster_id, p_attr_resp->attr_id,
                 p_attr_resp->attr_type, nrf_log_push(print_buf));
             ZB_MEMSET(print_buf, 0x00, bytes_written);

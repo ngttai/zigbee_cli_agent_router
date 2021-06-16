@@ -59,6 +59,7 @@
             "${SDK_ROOT}/components/libraries/timer"
         ],
         "COMMON_DEFS": [
+            "USE_APP_CONFIG",
             "APP_TIMER_V2",
             "APP_TIMER_V2_RTC1_ENABLED",
             "CONFIG_GPIO_AS_PINRESET",

@@ -159,8 +159,7 @@ static void cmd_zb_role(nrf_cli_t const * p_cli, size_t argc, char **argv)
 static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
     uint32_t   channel;
-    zb_bool_t  ret;
-    zb_uint8_t mode_mask = ZB_BDB_NETWORK_STEERING;
+    zb_bool_t  ret = ZB_FALSE;
 
     if (nrf_cli_help_requested(p_cli))
     {
@@ -198,10 +197,13 @@ static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
             ret = ZB_FALSE;
         }
     }
+#ifndef NETWORK_STEERING_MANUAL
     else
     {
-        ret = bdb_start_top_level_commissioning(mode_mask);
+        ret = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
     }
+#else
+#endif
 
     if (ret)
     {
