@@ -472,12 +472,8 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
                 {
                     strcpy(ieee_addr_buf, "unknown");
                 }
-#ifndef NETWORK_STEERING_MANUAL
                 NRF_LOG_INFO("Network formed successfully, start network steering (Extended PAN ID: %s, PAN ID: 0x%04hx)", NRF_LOG_PUSH(ieee_addr_buf), ZB_PIBCACHE_PAN_ID());
                 comm_status = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
-#else
-                NRF_LOG_INFO("Network formed successfully (Extended PAN ID: %s, PAN ID: 0x%04hx)", NRF_LOG_PUSH(ieee_addr_buf), ZB_PIBCACHE_PAN_ID());
-#endif
             }
             else
             {

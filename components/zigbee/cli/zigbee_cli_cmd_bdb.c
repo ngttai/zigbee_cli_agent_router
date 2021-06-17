@@ -197,13 +197,10 @@ static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
             ret = ZB_FALSE;
         }
     }
-#ifndef NETWORK_STEERING_MANUAL
     else
     {
         ret = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
     }
-#else
-#endif
 
     if (ret)
     {
