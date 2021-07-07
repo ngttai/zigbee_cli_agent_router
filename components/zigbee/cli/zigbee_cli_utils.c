@@ -146,7 +146,13 @@ int zcl_attr_to_str(char * p_str_buf, uint16_t buf_len, zb_uint16_t attr_type, z
             bytes_written = to_hex_str(p_str_buf, buf_len, (const uint8_t *)p_attr, sizeof(zb_64bit_addr_t), true);
             /*lint -restore */
             break;
-
+        case ZB_ZCL_ATTR_TYPE_SINGLE:
+        {
+            float attr_val;
+            ZB_MEMCPY(&attr_val, p_attr, sizeof(float));
+            bytes_written = snprintf(p_str_buf, buf_len, PRINT_FLOAT_MARKER, PRINT_FLOAT(attr_val));
+        }
+        break;
         default:
             bytes_written = snprintf(p_str_buf, buf_len, "Value type 0x%x unsupported", attr_type);
             break;

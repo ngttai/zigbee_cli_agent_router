@@ -84,6 +84,25 @@ static inline void print_error(nrf_cli_t const * p_cli, const char * p_message, 
     }
 }
 
+/**
+ * @brief Macro to be used in a formatted string to a pass float number to the log.
+ *
+ * Use this macro in a formatted string instead of the %f specifier together with
+ * @ref NRF_LOG_FLOAT macro.
+ * Example: NRF_LOG_INFO("My float number" NRF_LOG_FLOAT_MARKER "\r\n", NRF_LOG_FLOAT(f)))
+ */
+#define PRINT_FLOAT_MARKER "%s%ld.%02ld"
+
+/**
+ * @brief Macro for dissecting a float number into two numbers (integer and residuum).
+ */
+#define PRINT_FLOAT(val) ((val) < 0 && (val) > -1.0) ? "-" : "",            \
+                         (int32_t)(val),                                    \
+                         (int32_t)((((val) > 0) ? (val) - (int32_t)(val)    \
+                                                : (int32_t)(val) - (val)) * \
+                                   100)
+
+
 /**@breif Print a list of items.
  * 
  * Individual items in the list are delimited by comma.
