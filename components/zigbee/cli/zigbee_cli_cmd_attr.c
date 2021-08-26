@@ -411,7 +411,7 @@ static zb_void_t readattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 
     if (p_row->manuf_code != ZB_ZCL_MANUF_CODE_INVALID)
     {
-        ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_MANUF(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE, 0x115F);
+        ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_MANUF(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE, p_row->manuf_code);
     }
     else
     {
