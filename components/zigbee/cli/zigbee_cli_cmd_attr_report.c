@@ -100,8 +100,10 @@ typedef struct {
 typedef struct {
     zb_uint16_t profile_id;
     zb_uint16_t cluster_id;
+    zb_uint16_t manuf_code;
     zb_uint16_t attr_id;
     zb_uint8_t  attr_type;
+    zb_uint8_t  attr_value[32];
     zb_uint16_t interval_min;
     zb_uint16_t interval_max;
     zb_addr_u   remote_node;
@@ -129,6 +131,10 @@ static const nrf_cli_getopt_option_t opt[] = {
         "",
         "-p",
         "Set profile ID, HA profile by default"),
+    NRF_CLI_OPT(
+        "",
+        "-m",
+        "Set manufacture code"),
 };
 
 /**
@@ -407,6 +413,10 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     zb_ret_t                    zb_err_code;
     zb_bool_t                   subscribe;
 
+    zb_bool_t is_direction_present = ZB_FALSE;
+    zb_bool_t is_ha_profile_present = ZB_FALSE;
+    zb_bool_t is_manuf_code_present = ZB_FALSE;
+
     subscribe = (strcmp(argv[0], "on") == 0) ? ZB_TRUE : ZB_FALSE;
 
     if ((argc == 1) || (nrf_cli_help_requested(p_cli)))
@@ -414,8 +424,8 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %03s %s\r\n", argv[0],
-                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
-                        "       <h:attr ID> <h:attr type>");
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] [-m <h:manuf_code>]\r\n"
+                        "       <h:attr ID> <h:attr type> <h:attr value>");
         if (subscribe == ZB_TRUE)
         {
             nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "       [<d:min interval (s)>] [<d:max interval (s)>]\r\n");
@@ -424,20 +434,11 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    bool is_direction_present = (!strcmp(argv[4], "-c"));
-    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
-                                 (is_direction_present && !strcmp(argv[5], "-p"));
-
-    if (((subscribe == ZB_TRUE) && ((is_direction_present && is_ha_profile_present && ((argc < 9) || (argc > 11))) ||
-                                    (!is_direction_present && is_ha_profile_present && ((argc < 8) || (argc > 10))) ||
-                                    (is_direction_present && !is_ha_profile_present && ((argc < 7) || (argc > 9))) ||
-                                    (!is_direction_present && !is_ha_profile_present && ((argc < 6) || (argc > 8))))) ||
-        ((subscribe == ZB_FALSE) && ((is_direction_present && is_ha_profile_present && (argc != 9)) ||
-                                     (!is_direction_present && is_ha_profile_present && (argc != 8)) ||
-                                     (is_direction_present && !is_ha_profile_present && (argc != 7)) ||
-                                     (!is_direction_present && !is_ha_profile_present && (argc != 6)))))
+    if ((argc < 7) ||
+        ((subscribe == ZB_TRUE) && (argc > 14)) ||
+        ((subscribe == ZB_FALSE) && (argc > 12)))
     {
-        print_error(p_cli, "Incorrect number of arguments", ZB_FALSE);
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
     }
 
@@ -461,15 +462,17 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    if (is_direction_present)
+    if (!strcmp(*(argv + 1), "-c"))
     {
         argv++;
+        is_direction_present = ZB_TRUE;
     }
 
     /* Check if different from HA profile should be used */
-    if (is_ha_profile_present)
+    if (!strcmp(*(argv + 1), "-p"))
     {
         argv++;
+        is_ha_profile_present = ZB_TRUE;
         if (!parse_hex_u16(*(++argv), &(req.profile_id)))
         {
             print_error(p_cli, "Incorrect profile ID", ZB_FALSE);
@@ -481,6 +484,21 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         req.profile_id = ZB_AF_HA_PROFILE_ID;
     }
 
+    if (!strcmp(*(argv + 1), "-m"))
+    {
+        argv++;
+        is_manuf_code_present = ZB_TRUE;
+        if (!parse_hex_u16(*(++argv), &(req.manuf_code)))
+        {
+            print_error(p_cli, "Incorrect profile ID", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        req.manuf_code = ZB_ZCL_MANUF_CODE_INVALID;
+    }
+    
     if (!parse_hex_u16(*(++argv), &(req.attr_id)))
     {
         print_error(p_cli, "Incorrect attribute ID", ZB_FALSE);
@@ -490,6 +508,24 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     if (!parse_hex_u8(*(++argv), &(req.attr_type)))
     {
         print_error(p_cli, "Incorrect attribute type", ZB_FALSE);
+        return;
+    }
+
+    zb_uint8_t len = strlen(*(++argv));
+    if (req.attr_type == ZB_ZCL_ATTR_TYPE_CHAR_STRING)
+    {
+        req.attr_value[0] = len;
+        strncpy((zb_char_t *)(req.attr_value + 1), *argv, sizeof(req.attr_value) - 1);
+    }
+    else if (req.attr_type == ZB_ZCL_ATTR_TYPE_SINGLE)
+    {
+        float value_f = atof(*argv);
+        ZB_MEMCPY(req.attr_value, &value_f, sizeof(float));
+        // nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Attr value float: " PRINT_FLOAT_MARKER "\r\n", PRINT_FLOAT(value_f));
+    }
+    else if (!parse_hex_str(*argv, len, req.attr_value, sizeof(req.attr_value), true))
+    {
+        print_error(p_cli, "Invalid attribute value", ZB_FALSE);
         return;
     }
 
@@ -505,22 +541,57 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
         req.interval_max = ZIGBEE_CLI_CONFIGURE_REPORT_OFF_MAX_INTERVAL;
     }
 
-    if ((!is_ha_profile_present && (argc > 6)) ||
-        (is_ha_profile_present && (argc > 8)))
+    if (subscribe == ZB_TRUE)
     {
-        if (!sscanf(*(++argv), "%hu", &(req.interval_min)))
+        if (((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc > 7)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc > 9)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)) && (argc > 11)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc > 8)) ||
+            ((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc > 10)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE) && (argc > 12)))
         {
-            print_error(p_cli, "Incorrect minimum interval", ZB_FALSE);
+            if (!sscanf(*(++argv), "%hu", &(req.interval_min)))
+            {
+                print_error(p_cli, "Incorrect minimum interval", ZB_FALSE);
+                return;
+            }
+        }
+
+        if (((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc > 8)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc > 10)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)) && (argc > 12)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc > 9)) ||
+            ((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc > 11)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE) && (argc > 13)))
+        {
+            if (!sscanf(*(++argv), "%hu", &(req.interval_max)))
+            {
+                print_error(p_cli, "Incorrect maximum interval", ZB_FALSE);
+                return;
+            }
+        }
+
+        if (((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && ((argc < 7) || (argc > 9))) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && ((argc < 9) || (argc > 11))) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)) && ((argc < 11) || (argc > 13))) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && ((argc < 8) || (argc > 10))) ||
+            ((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && ((argc < 10) || (argc > 12))) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE) && ((argc < 12) || (argc > 14))))
+        {
+            print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
             return;
         }
     }
-
-    if ((!is_ha_profile_present && (argc > 7)) ||
-        (is_ha_profile_present && (argc > 9)))
+    else
     {
-        if (!sscanf(*(++argv), "%hu", &(req.interval_max)))
+        if (((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc != 7)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc != 9)) ||
+            ((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)) && (argc != 11)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE) && (argc != 8)) ||
+            ((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)) && (argc != 10)) ||
+            ((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE) && (argc != 12)))
         {
-            print_error(p_cli, "Incorrect maximum interval", ZB_FALSE);
+            print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
             return;
         }
     }
@@ -545,25 +616,45 @@ void cmd_zb_subscribe(nrf_cli_t const * p_cli, size_t argc, char **argv)
     p_tsn_cli->p_cli = p_cli;
     p_tsn_cli->tsn   = ZCL_CTX().seq_number;
 
+
+#define ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_REQ_MANUF(buffer, ptr, direction, def_resp, manuf_code)                \
+    {                                                                                                                  \
+        ptr = ZB_ZCL_START_PACKET(buffer);                                                                             \
+        ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_REQ_FRAME_CONTROL_A(                                                          \
+            ptr, direction, ZB_ZCL_MANUFACTURER_SPECIFIC, def_resp);                                                   \
+        ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(ptr, ZB_ZCL_GET_SEQ_NUM(), ZB_TRUE, manuf_code, ZB_ZCL_CMD_CONFIG_REPORT); \
+    }
+
+#define ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_REQ(buffer, ptr, direction, def_resp)         \
+    {                                                                                         \
+        ptr = ZB_ZCL_START_PACKET(buffer);                                                    \
+        ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_REQ_FRAME_CONTROL_A(                                 \
+            ptr, direction, ZB_ZCL_NOT_MANUFACTURER_SPECIFIC, def_resp);                      \
+        ZB_ZCL_CONSTRUCT_COMMAND_HEADER(ptr, ZB_ZCL_GET_SEQ_NUM(), ZB_ZCL_CMD_CONFIG_REPORT); \
+    }
+
     // Construct and send request.
-    if (is_direction_present)
+    if (req.manuf_code != ZB_ZCL_MANUF_CODE_INVALID)
     {
-        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_CLI_REQ(bufid,
-                                                        p_cmd_ptr,
-                                                        ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_REQ_MANUF(bufid,
+                                                          p_cmd_ptr,
+                                                          (is_direction_present ? ZB_ZCL_FRAME_DIRECTION_TO_CLI : ZB_ZCL_FRAME_DIRECTION_TO_SRV),
+                                                          ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
+                                                          req.manuf_code);
     }
     else
     {
-        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_SRV_REQ(bufid,
-                                                        p_cmd_ptr,
-                                                        ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+        ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_REQ(bufid,
+                                                    p_cmd_ptr,
+                                                    (is_direction_present ? ZB_ZCL_FRAME_DIRECTION_TO_CLI : ZB_ZCL_FRAME_DIRECTION_TO_SRV),
+                                                    ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
     }
     ZB_ZCL_GENERAL_ADD_SEND_REPORT_CONFIGURE_REPORTING_REQ(p_cmd_ptr,
-        req.attr_id, req.attr_type, req.interval_min, req.interval_max,
-        ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_VALUE_CHANGE);
+                                                           req.attr_id, req.attr_type, req.interval_min, req.interval_max,
+                                                           req.attr_value);
     ZB_ZCL_GENERAL_SEND_CONFIGURE_REPORTING_REQ(bufid, p_cmd_ptr,
-        req.remote_node, req.remote_addr_mode, req.remote_ep, zb_get_cli_endpoint(),
-        req.profile_id, req.cluster_id, NULL);
+                                                req.remote_node, req.remote_addr_mode, req.remote_ep, zb_get_cli_endpoint(),
+                                                req.profile_id, req.cluster_id, NULL);
 
     // Start timeout timer.
     zb_err_code = ZB_SCHEDULE_APP_ALARM(cmd_zb_subscribe_unsubscribe_timeout, p_tsn_cli->tsn,

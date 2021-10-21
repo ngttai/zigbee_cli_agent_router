@@ -82,6 +82,7 @@ typedef struct attr_query_s
     zb_uint8_t                 attr_type;
     zb_uint8_t                 attr_value[32];
     zb_zcl_frame_direction_t   direction;
+    zb_uint16_t                manuf_code;
     nrf_cli_t                * p_cli;
 } attr_query_t;
 
@@ -97,6 +98,10 @@ static const nrf_cli_getopt_option_t opt[] = {
         "",
         "-p",
         "Set profile ID, HA profile by default"),
+    NRF_CLI_OPT(
+        "",
+        "-m",
+        "Set manufacture code"),
 };
 
 /**@brief Get the first free row in the attributes table, return -1 if none
@@ -243,6 +248,15 @@ static void print_read_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
         {
             nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nID: 0x%04hx Type: 0x%02hx Value: %s\r\n",
                             p_attr_resp->attr_id, p_attr_resp->attr_type, attr_buf);
+            if (p_attr_resp->attr_type == ZB_ZCL_ATTR_TYPE_CHAR_STRING)
+            {
+                nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\nRAW string Value: ");
+                for (size_t idx = 1; idx <= p_attr_resp->attr_value[0]; idx++)
+                {
+                    nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "%02hx", p_attr_resp->attr_value[idx]);
+                }
+                nrf_cli_fprintf(p_row->p_cli, NRF_CLI_NORMAL, "\r\n");
+            }
             print_done(p_row->p_cli, ZB_FALSE);
         }
     }
@@ -395,7 +409,15 @@ static zb_void_t readattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
         return;
     }
 
-    ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    if (p_row->manuf_code != ZB_ZCL_MANUF_CODE_INVALID)
+    {
+        ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_MANUF(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE, p_row->manuf_code);
+    }
+    else
+    {
+        ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    }
+
     ZB_ZCL_GENERAL_ADD_ID_READ_ATTR_REQ(p_cmd_buf, p_row->attr_id);
     ZB_ZCL_GENERAL_SEND_READ_ATTR_REQ(bufid, p_cmd_buf, p_row->remote_node,
                                       p_row->remote_addr_mode, p_row->remote_ep,
@@ -427,9 +449,31 @@ static zb_void_t writeattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
         return;
     }
 
-    ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
-    ZB_ZCL_GENERAL_ADD_VALUE_WRITE_ATTR_REQ(p_cmd_buf, p_row->attr_id, p_row->attr_type,
-                                            p_row->attr_value);
+#define ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_MANUF(buffer, cmd_ptr, direction, def_resp, manuf_code)                                    \
+    {                                                                                                                     \
+        cmd_ptr = ZB_ZCL_START_PACKET(buffer);                                                                            \
+        ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_REQ_FRAME_CONTROL_A(cmd_ptr, direction, ZB_ZCL_MANUFACTURER_SPECIFIC, def_resp); \
+        ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(cmd_ptr, ZB_ZCL_GET_SEQ_NUM(), ZB_TRUE, manuf_code, ZB_ZCL_CMD_WRITE_ATTRIB);     \
+    }
+
+    if (p_row->manuf_code != ZB_ZCL_MANUF_CODE_INVALID)
+    {
+        ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_MANUF(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE, p_row->manuf_code);
+    }
+    else
+    {
+        ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+    }
+
+    if (p_row->attr_type == ZB_ZCL_ATTR_TYPE_SINGLE) {
+        ZB_ZCL_PACKET_PUT_DATA16_VAL(p_cmd_buf, p_row->attr_id);
+        ZB_ZCL_PACKET_PUT_DATA8(p_cmd_buf, p_row->attr_type);
+        ZB_ZCL_PACKET_PUT_DATA32(p_cmd_buf, p_row->attr_value);
+    }
+    else {
+        ZB_ZCL_GENERAL_ADD_VALUE_WRITE_ATTR_REQ(p_cmd_buf, p_row->attr_id, p_row->attr_type,
+                                                p_row->attr_value);
+    }
     ZB_ZCL_GENERAL_SEND_WRITE_ATTR_REQ(bufid, p_cmd_buf, p_row->remote_node,
                                        p_row->remote_addr_mode, p_row->remote_ep,
                                        zb_get_cli_endpoint(), p_row->profile_id,
@@ -459,21 +503,54 @@ static zb_void_t disc_attr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
         return;
     }
 
-    ZB_ZCL_GENERAL_DISC_ATTR_REQ_A(bufid,
-                                   cmd_ptr,
-                                   p_row->direction,
-                                   ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
-                                   p_row->attr_id, /* start_attr_id */
-                                   p_row->attr_value[0], /* max_len */
-                                   p_row->remote_node,
-                                   p_row->remote_addr_mode,
-                                   p_row->remote_ep,
-                                   zb_get_cli_endpoint(),
-                                   p_row->profile_id,
-                                   p_row->cluster_id,
-                                   frame_acked_cb);
-}
+#define ZB_ZCL_GENERAL_DISC_ATTR_REQ_MANUF(buffer, cmd_ptr, direction, def_resp, manuf_code,                             \
+                                           start_attr_id, max_len,                                                       \
+                                           addr, dst_addr_mode, dst_ep, ep, profile_id, cluster_id, cb)                  \
+    {                                                                                                                    \
+        zb_uint8_t *cmd_ptr = ZB_ZCL_START_PACKET(buffer);                                                               \
+        ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_REQ_FRAME_CONTROL_A(cmd_ptr, direction,                                         \
+                                                             ZB_ZCL_MANUFACTURER_SPECIFIC, def_resp);                    \
+        ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(cmd_ptr, ZB_ZCL_GET_SEQ_NUM(), ZB_TRUE, manuf_code, ZB_ZCL_CMD_DISC_ATTRIB); \
+        ZB_ZCL_PACKET_PUT_DATA16_VAL(cmd_ptr, (start_attr_id));                                                          \
+        ZB_ZCL_PACKET_PUT_DATA8(cmd_ptr, (max_len));                                                                     \
+        ZB_ZCL_FINISH_PACKET(buffer, cmd_ptr)                                                                            \
+        ZB_ZCL_SEND_COMMAND_SHORT(buffer, addr, dst_addr_mode, dst_ep, ep, profile_id, cluster_id, cb);                  \
+    }
 
+    if (p_row->manuf_code != ZB_ZCL_MANUF_CODE_INVALID)
+    {
+        ZB_ZCL_GENERAL_DISC_ATTR_REQ_MANUF(bufid,
+                                           cmd_ptr,
+                                           p_row->direction,
+                                           ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
+                                           p_row->manuf_code,
+                                           p_row->attr_id,       /* start_attr_id */
+                                           p_row->attr_value[0], /* max_len */
+                                           p_row->remote_node,
+                                           p_row->remote_addr_mode,
+                                           p_row->remote_ep,
+                                           zb_get_cli_endpoint(),
+                                           p_row->profile_id,
+                                           p_row->cluster_id,
+                                           frame_acked_cb);
+    }
+    else
+    {
+        ZB_ZCL_GENERAL_DISC_ATTR_REQ_A(bufid,
+                                       cmd_ptr,
+                                       p_row->direction,
+                                       ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
+                                       p_row->attr_id,       /* start_attr_id */
+                                       p_row->attr_value[0], /* max_len */
+                                       p_row->remote_node,
+                                       p_row->remote_addr_mode,
+                                       p_row->remote_ep,
+                                       zb_get_cli_endpoint(),
+                                       p_row->profile_id,
+                                       p_row->cluster_id,
+                                       frame_acked_cb);
+    }
+}
 
 /**@brief Retrieve the attribute value of the remote node.
  *
@@ -489,6 +566,10 @@ static zb_void_t disc_attr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
     zb_ret_t zb_err_code;
+    zb_bool_t is_direction_present = ZB_FALSE;
+    zb_bool_t is_ha_profile_present = ZB_FALSE;
+    zb_bool_t is_manuf_code_present = ZB_FALSE;
+
     zb_int8_t row = get_free_row_attr_table();
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
@@ -496,24 +577,13 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
-                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] [-m <h:manuf_code>]\r\n"
                         "        <h:attr ID>");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 
-    if ((argc < 5) || (argc > 8))
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
-
-    bool is_direction_present = ((argc != 7) && !strcmp(argv[4], "-c"));
-    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
-                                 (is_direction_present && !strcmp(argv[5], "-p"));
-
-    if ((((argc == 6) || (argc == 8)) && !is_direction_present) ||
-        (((argc == 7) || (argc == 8)) && !is_ha_profile_present))
+    if ((argc < 5) || (argc > 10))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -542,10 +612,11 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    if (is_direction_present)
+    if (!strcmp(*(argv + 1), "-c"))
     {
+        argv++;
+        is_direction_present = ZB_TRUE;
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_CLI;
-        ++argv;
     }
     else
     {
@@ -553,9 +624,10 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     }
 
     /* Check if different from HA profile should be used */
-    if (is_ha_profile_present)
+    if (!strcmp(*(argv + 1), "-p"))
     {
         argv++;
+        is_ha_profile_present = ZB_TRUE;
         if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
         {
             print_error(p_cli, "Invalid profile id", ZB_FALSE);
@@ -567,9 +639,35 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         p_row->profile_id = ZB_AF_HA_PROFILE_ID;
     }
 
+    if (!strcmp(*(argv + 1), "-m"))
+    {
+        argv++;
+        is_manuf_code_present = ZB_TRUE;
+        if (!parse_hex_u16(*(++argv), &(p_row->manuf_code)))
+        {
+            print_error(p_cli, "Invalid manufacture code", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        p_row->manuf_code = ZB_ZCL_MANUF_CODE_INVALID;
+    }
+
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
     {
         print_error(p_cli, "Invalid attribute id", ZB_FALSE);
+        return;
+    }
+
+    if (((argc == 5) && !((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 6) && !((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 7) && !((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 8) && !((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 9) && !((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE))) ||
+        ((argc == 10) && !((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE))))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
     }
 
@@ -604,6 +702,11 @@ void cmd_zb_readattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
     zb_ret_t zb_err_code;
+    zb_bool_t is_direction_present = ZB_FALSE;
+    zb_bool_t is_ha_profile_present = ZB_FALSE;
+    zb_bool_t is_manuf_code_present = ZB_FALSE;
+    zb_bool_t is_raw_string_present = ZB_FALSE;
+
     zb_int8_t row = get_free_row_attr_table();
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
@@ -611,24 +714,14 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
-                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
-                        "         <h:attr ID> <h:attr type> <h:attr value>");
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] [-m <h:manuf_code>]\r\n"
+                        "         <h:attr ID> <h:attr type> [-r] <h:attr value>");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "        -r: raw string mode, [<byte 0>...<byte n>], <byte 0> is str_len\r\n");
         return;
     }
 
-    if ((argc < 7) || (argc > 10))
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
-
-    bool is_direction_present = ((argc != 9) && !strcmp(argv[4], "-c"));
-    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
-                                 (is_direction_present && !strcmp(argv[5], "-p"));
-
-    if ((((argc == 8) || (argc == 10)) && !is_direction_present) ||
-        (((argc == 9) || (argc == 10)) && !is_ha_profile_present))
+    if ((argc < 7) || (argc > 13))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -657,10 +750,11 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    if (is_direction_present)
+    if (!strcmp(*(argv + 1), "-c"))
     {
+        argv++;
+        is_direction_present = ZB_TRUE;
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_CLI;
-        ++argv;
     }
     else
     {
@@ -668,9 +762,10 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     }
 
     /* Check if different from HA profile should be used */
-    if (is_ha_profile_present)
+    if (!strcmp(*(argv + 1), "-p"))
     {
         argv++;
+        is_ha_profile_present = ZB_TRUE;
         if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
         {
             print_error(p_cli, "Invalid profile id", ZB_FALSE);
@@ -681,7 +776,21 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     {
         p_row->profile_id = ZB_AF_HA_PROFILE_ID;
     }
-    
+
+    if (!strcmp(*(argv + 1), "-m"))
+    {
+        argv++;
+        is_manuf_code_present = ZB_TRUE;
+        if (!parse_hex_u16(*(++argv), &(p_row->manuf_code)))
+        {
+            print_error(p_cli, "Invalid manufacture code", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        p_row->manuf_code = ZB_ZCL_MANUF_CODE_INVALID;
+    } 
 
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
     {
@@ -695,15 +804,56 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    uint8_t len = strlen(*(++argv));
-    if (p_row->attr_type == ZB_ZCL_ATTR_TYPE_CHAR_STRING)
+    uint8_t len = 0;
+    if (!strcmp(*(argv + 1), "-r"))
     {
-        p_row->attr_value[0] = len;
-        strncpy((zb_char_t*)(p_row->attr_value + 1), *argv, sizeof(p_row->attr_value) - 1);
+        argv++;
+        is_raw_string_present = ZB_TRUE;
+        if (p_row->attr_type != ZB_ZCL_ATTR_TYPE_CHAR_STRING)
+        {
+            print_error(p_cli, "Raw mode only for attr type string", ZB_FALSE);
+            return;
+        }
+
+        len = strlen(*(++argv));
+        if (!parse_hex_str(*argv, len, p_row->attr_value, sizeof(p_row->attr_value), false))
+        {
+            print_error(p_cli, "Invalid attribute value", ZB_FALSE);
+            return;
+        }
     }
-    else if (!parse_hex_str(*argv, len, p_row->attr_value, sizeof(p_row->attr_value), true))
+    else
     {
-        print_error(p_cli, "Invalid attribute value", ZB_FALSE);
+        len = strlen(*(++argv));
+        if (p_row->attr_type == ZB_ZCL_ATTR_TYPE_CHAR_STRING)
+        {
+            p_row->attr_value[0] = len;
+            strncpy((zb_char_t *)(p_row->attr_value + 1), *argv, sizeof(p_row->attr_value) - 1);
+        }
+        else if (p_row->attr_type == ZB_ZCL_ATTR_TYPE_SINGLE)
+        {
+            float value_f = atof(*argv);
+            ZB_MEMCPY(p_row->attr_value, &value_f, sizeof(float));
+            // nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Attr value float: " PRINT_FLOAT_MARKER "\r\n", PRINT_FLOAT(value_f));
+        }
+        else if (!parse_hex_str(*argv, len, p_row->attr_value, sizeof(p_row->attr_value), true))
+        {
+            print_error(p_cli, "Invalid attribute value", ZB_FALSE);
+            return;
+        }
+    }
+
+    if (((argc == 7) && !((is_direction_present == ZB_FALSE) && (is_raw_string_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 8) && !(((is_direction_present == ZB_TRUE) == !(is_raw_string_present == ZB_TRUE)) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 9) && !(((is_direction_present == ZB_TRUE) && (is_raw_string_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE)) ||
+                          ((is_direction_present == ZB_FALSE) && (is_raw_string_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE))))) ||
+        ((argc == 10) && !(((is_direction_present == ZB_TRUE) == !(is_raw_string_present == ZB_TRUE)) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 11) && !(((is_direction_present == ZB_TRUE) && (is_raw_string_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE))) ||
+                           ((is_direction_present == ZB_FALSE) && (is_raw_string_present == ZB_FALSE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 12) && !(((is_direction_present == ZB_TRUE) == !(is_raw_string_present == ZB_TRUE)) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE))) ||
+        ((argc == 13) && !(is_direction_present == ZB_TRUE) && (is_raw_string_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE)))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
     }
 
@@ -735,6 +885,10 @@ void cmd_zb_writeattr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
     zb_ret_t zb_err_code;
+    zb_bool_t is_direction_present = ZB_FALSE;
+    zb_bool_t is_ha_profile_present = ZB_FALSE;
+    zb_bool_t is_manuf_code_present = ZB_FALSE;
+
     zb_int8_t row = get_free_row_attr_table();
 
     if ((argc == 1) || nrf_cli_help_requested(p_cli))
@@ -742,24 +896,13 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
-                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] \r\n"
+                        "<h:dst_addr> <d:ep> <h:cluster> [-c] [-p <h:profile>] [-m <h:manuf_code>]\r\n"
                         "            <h:start_attr ID> <d:max_attr>");
         nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Note:\r\n   h: is for hex, d: is for decimal\r\n");
         return;
     }
 
-    if ((argc < 6) || (argc > 9))
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
-    
-    bool is_direction_present = ((argc != 8) && !strcmp(argv[4], "-c"));
-    bool is_ha_profile_present = (!is_direction_present && !strcmp(argv[4], "-p")) ||
-                                 (is_direction_present && !strcmp(argv[5], "-p"));
-
-    if ((((argc == 7) || (argc == 9)) && !is_direction_present) ||
-        (((argc == 8) || (argc == 9)) && !is_ha_profile_present))
+    if ((argc < 6) || (argc > 11))
     {
         print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
         return;
@@ -788,10 +931,11 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
         return;
     }
 
-    if (is_direction_present)
+    if (!strcmp(*(argv + 1), "-c"))
     {
+        argv++;
+        is_direction_present = ZB_TRUE;
         p_row->direction = ZB_ZCL_FRAME_DIRECTION_TO_CLI;
-        ++argv;
     }
     else
     {
@@ -799,9 +943,10 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     }
 
     /* Check if different from HA profile should be used */
-    if (is_ha_profile_present)
+    if (!strcmp(*(argv + 1), "-p"))
     {
         argv++;
+        is_ha_profile_present = ZB_TRUE;
         if (!parse_hex_u16(*(++argv), &(p_row->profile_id)))
         {
             print_error(p_cli, "Invalid profile id", ZB_FALSE);
@@ -811,6 +956,21 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     else
     {
         p_row->profile_id = ZB_AF_HA_PROFILE_ID;
+    }
+
+    if (!strcmp(*(argv + 1), "-m"))
+    {
+        argv++;
+        is_manuf_code_present = ZB_TRUE;
+        if (!parse_hex_u16(*(++argv), &(p_row->manuf_code)))
+        {
+            print_error(p_cli, "Invalid manufacture code", ZB_FALSE);
+            return;
+        }
+    }
+    else
+    {
+        p_row->manuf_code = ZB_ZCL_MANUF_CODE_INVALID;
     }
 
     if (!parse_hex_u16(*(++argv), &(p_row->attr_id)))
@@ -828,7 +988,18 @@ void cmd_zb_disc_attr(nrf_cli_t const * p_cli, size_t argc, char **argv)
     {
         p_row->attr_value[0] = DISC_ATTRIBUTE_MAX_LEN;
     }
-    
+
+    if (((argc == 6) && !((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 7) && !((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_FALSE) && (is_manuf_code_present == ZB_FALSE))) ||
+        ((argc == 8) && !((is_direction_present == ZB_FALSE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 9) && !((is_direction_present == ZB_TRUE) && ((is_ha_profile_present == ZB_TRUE) == !(is_manuf_code_present == ZB_TRUE)))) ||
+        ((argc == 10) && !((is_direction_present == ZB_FALSE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE))) ||
+        ((argc == 11) && !((is_direction_present == ZB_TRUE) && (is_ha_profile_present == ZB_TRUE) && (is_manuf_code_present == ZB_TRUE))))
+    {
+        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        return;
+    }
+
     p_row->req_type = ATTR_DISC_REQUEST;
     p_row->taken = ZB_TRUE;
     /* Put the CLI instance to be used later */
